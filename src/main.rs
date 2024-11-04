@@ -31,6 +31,11 @@ fn looks_like_url(s: &str) -> bool {
         return true;
     }
 
+    // Check for invalid URL patterns
+    if s.starts_with(".") {
+        return false;
+    }
+
     // Try to parse as URL with added https:// if needed
     let url_str = if !s.contains("://") {
         format!("https://{}", s)
@@ -132,4 +137,152 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     println!("{}", blurhash.expect("Error during Blurhash encoding"));
 
     Ok(())
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_looks_like_url() {
+        // Test valid URLs
+        assert!(looks_like_url("https://example.com"));
+        assert!(looks_like_url("http://example.com"));
+        assert!(looks_like_url("www.example.com"));
+        assert!(looks_like_url("example.com/path"));
+        assert!(looks_like_url("subdomain.example.com"));
+        assert!(looks_like_url("example.com/image.jpg"));
+        assert!(looks_like_url("cdn.example.com/assets/img.png"));
+        assert!(looks_like_url("http://localhost")); // Local URLs
+        assert!(looks_like_url("https://localhost:8080")); // Local URLs with port
+        
+        // Test invalid URLs
+        assert!(!looks_like_url("C:\\path\\to\\file.jpg"));
+        assert!(!looks_like_url("/usr/local/file.jpg"));
+        assert!(!looks_like_url("just-text"));
+        assert!(!looks_like_url(""));
+        assert!(!looks_like_url("example"));
+        assert!(!looks_like_url("example."));
+        assert!(!looks_like_url(".example"));
+    }
+
+    #[test]
+    fn test_looks_like_local_path() {
+        // Test Windows-style paths
+        assert!(looks_like_local_path("C:\\Users\\test\\image.jpg"));
+        assert!(looks_like_local_path("D:\\photos\\vacation\\pic.png"));
+        assert!(looks_like_local_path(".\\relative\\path.jpg"));
+        assert!(looks_like_local_path("..\\parent\\path.jpg"));
+        assert!(looks_like_local_path("folder\\subfolder\\image.jpg"));
+        
+        // Test Unix-style paths
+        assert!(looks_like_local_path("/usr/local/images/test.jpg"));
+        assert!(looks_like_local_path("./relative/path.jpg"));
+        assert!(looks_like_local_path("../parent/path.jpg"));
+        assert!(looks_like_local_path("folder/subfolder/image.jpg"));
+        assert!(looks_like_local_path("/root/path.jpg"));
+        
+        // Test simple filenames
+        assert!(looks_like_local_path("image.jpg"));
+        assert!(looks_like_local_path("document.pdf"));
+        assert!(looks_like_local_path("test-file.png"));
+        assert!(looks_like_local_path("my.complex.file.name.jpg"));
+        
+        // Test invalid paths
+        assert!(!looks_like_local_path("https://example.com/image.jpg"));
+        assert!(!looks_like_local_path("http://example.com/image.jpg"));
+        assert!(!looks_like_local_path("")); // Empty string
+        assert!(!looks_like_local_path("noextension"));
+        assert!(!looks_like_local_path(".hidden")); // Hidden file without extension
+        assert!(!looks_like_local_path(".")); // Current directory
+        assert!(!looks_like_local_path("..")); // Parent directory
+    }
+
+    #[test]
+    fn test_cli_parameters() {
+        // Test valid component ranges
+        let cli = Cli {
+            image: "test.jpg".to_string(),
+            components_x: Some(4),
+            components_y: Some(3),
+        };
+        assert!(validate_cli_parameters(&cli).is_ok());
+
+        // Test minimum valid values
+        let cli = Cli {
+            image: "test.jpg".to_string(),
+            components_x: Some(1),
+            components_y: Some(1),
+        };
+        assert!(validate_cli_parameters(&cli).is_ok());
+
+        // Test maximum valid values
+        let cli = Cli {
+            image: "test.jpg".to_string(),
+            components_x: Some(9),
+            components_y: Some(9),
+        };
+        assert!(validate_cli_parameters(&cli).is_ok());
+
+        // Test invalid component ranges
+        let cli = Cli {
+            image: "test.jpg".to_string(),
+            components_x: Some(10),
+            components_y: Some(3),
+        };
+        assert!(validate_cli_parameters(&cli).is_err());
+
+        let cli = Cli {
+            image: "test.jpg".to_string(),
+            components_x: Some(4),
+            components_y: Some(10),
+        };
+        assert!(validate_cli_parameters(&cli).is_err());
+
+        let cli = Cli {
+            image: "test.jpg".to_string(),
+            components_x: Some(0),
+            components_y: Some(3),
+        };
+        assert!(validate_cli_parameters(&cli).is_err());
+
+        // Test missing components
+        let cli = Cli {
+            image: "test.jpg".to_string(),
+            components_x: Some(4),
+            components_y: None,
+        };
+        assert!(validate_cli_parameters(&cli).is_err());
+
+        let cli = Cli {
+            image: "test.jpg".to_string(),
+            components_x: None,
+            components_y: Some(3),
+        };
+        assert!(validate_cli_parameters(&cli).is_err());
+
+        // Test default values (both None is valid)
+        let cli = Cli {
+            image: "test.jpg".to_string(),
+            components_x: None,
+            components_y: None,
+        };
+        assert!(validate_cli_parameters(&cli).is_ok());
+    }
+
+    // Helper function for validating CLI parameters
+    fn validate_cli_parameters(cli: &Cli) -> Result<(), Box<dyn std::error::Error>> {
+        let components_x = cli.components_x.unwrap_or(4);
+        let components_y = cli.components_y.unwrap_or(3);
+
+        if cli.components_x.is_some() != cli.components_y.is_some() {
+            return Err("If specifying components, both -x and -y must be provided".into());
+        }
+
+        if !(1..=9).contains(&components_x) || !(1..=9).contains(&components_y) {
+            return Err("The values of each component needs to be 1-9".into());
+        }
+
+        Ok(())
+    }
 }
