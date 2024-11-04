@@ -1,8 +1,8 @@
 use blurhash::encode;
 use clap::Parser;
 use image::GenericImageView;
-use std::path::Path;
 use reqwest::blocking::get;
+use std::path::Path;
 use url::Url;
 
 #[derive(Parser)]
@@ -48,9 +48,8 @@ fn looks_like_url(s: &str) -> bool {
         if url.has_host() && url.domain().is_some() {
             // Additional validation: should have at least one dot and valid TLD
             if let Some(domain) = url.domain() {
-                return domain.contains('.') && 
-                       !domain.ends_with('.') && 
-                       !domain.contains('\\');  // Backslashes typically indicate local paths
+                return domain.contains('.') && !domain.ends_with('.') && !domain.contains('\\');
+                // Backslashes typically indicate local paths
             }
         }
     }
@@ -69,7 +68,7 @@ fn looks_like_local_path(s: &str) -> bool {
         if s.len() >= 2 && s.chars().nth(1) == Some(':') {
             return true;
         }
-        
+
         // Check for relative paths with directory separators
         if !s.contains("://") {
             return true;
@@ -78,10 +77,11 @@ fn looks_like_local_path(s: &str) -> bool {
 
     // Check for simple filenames with extensions
     if s.contains('.') && !s.contains("://") && !s.starts_with("www.") {
-        let last_segment = Path::new(s).file_name()
+        let last_segment = Path::new(s)
+            .file_name()
             .and_then(|s| s.to_str())
             .unwrap_or("");
-        
+
         // If it looks like a filename with extension
         if last_segment.contains('.') && !last_segment.starts_with('.') {
             return true;
@@ -155,7 +155,7 @@ mod tests {
         assert!(looks_like_url("cdn.example.com/assets/img.png"));
         assert!(looks_like_url("http://localhost")); // Local URLs
         assert!(looks_like_url("https://localhost:8080")); // Local URLs with port
-        
+
         // Test invalid URLs
         assert!(!looks_like_url("C:\\path\\to\\file.jpg"));
         assert!(!looks_like_url("/usr/local/file.jpg"));
@@ -174,20 +174,20 @@ mod tests {
         assert!(looks_like_local_path(".\\relative\\path.jpg"));
         assert!(looks_like_local_path("..\\parent\\path.jpg"));
         assert!(looks_like_local_path("folder\\subfolder\\image.jpg"));
-        
+
         // Test Unix-style paths
         assert!(looks_like_local_path("/usr/local/images/test.jpg"));
         assert!(looks_like_local_path("./relative/path.jpg"));
         assert!(looks_like_local_path("../parent/path.jpg"));
         assert!(looks_like_local_path("folder/subfolder/image.jpg"));
         assert!(looks_like_local_path("/root/path.jpg"));
-        
+
         // Test simple filenames
         assert!(looks_like_local_path("image.jpg"));
         assert!(looks_like_local_path("document.pdf"));
         assert!(looks_like_local_path("test-file.png"));
         assert!(looks_like_local_path("my.complex.file.name.jpg"));
-        
+
         // Test invalid paths
         assert!(!looks_like_local_path("https://example.com/image.jpg"));
         assert!(!looks_like_local_path("http://example.com/image.jpg"));
